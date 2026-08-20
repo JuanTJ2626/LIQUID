@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-light: #f8f9fa;
+    --text-dark: #0a0a0d;
+    --accent-cyan: #0088ff;
+    --accent-violet: #6600ff;
+  }
+
+  body {
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    cursor: default;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f8f9fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Glassmorphism Light utilities */
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.glass-panel-dark {
+  background: rgba(10, 10, 15, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.glass-panel-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
+}
+
+/* High Contrast Text Glow */
+.text-stroke-black {
+  -webkit-text-stroke: 1.5px #000000;
+  color: transparent;
+}
+
+.text-stroke-cyan {
+  -webkit-text-stroke: 1.5px #0077ff;
+  color: transparent;
+}
+
+/* Grain Noise Overlay Light */
+.noise-bg-light {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* Hide default cursor on desktop */
+@media (min-width: 1024px) {
+  .custom-cursor-active, 
+  .custom-cursor-active a, 
+  .custom-cursor-active button {
+    cursor: none !important;
+  }
+}
