@@ -38,6 +38,9 @@ export interface MagnifyingGlassProps {
   /** Optical magnification zoom factor, e.g. 1.25x - 2.5x (default: 1.5) */
   zoom?: number;
 
+  /** Inward spherical distortion strength [0..1] */
+  inwardDistortion?: number;
+
   /** Outer rim bevel thickness in pixels (default: 35) */
   bezelThickness?: number;
 
@@ -76,6 +79,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
   borderRadius,
   fixed = false,
   zoom = 1.35,
+  inwardDistortion = 0.25,
   bezelThickness = 35,
   ior = 1.45,
   initialPosition,
@@ -93,7 +97,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
   const borderRadiusStyle = actualBR >= 9000 ? '9999px' : `${actualBR}px`;
 
   const defaultPos = initialPosition ?? (fixed
-    ? { x: typeof window !== 'undefined' ? window.innerWidth * 0.72 : 600, y: typeof window !== 'undefined' ? 380 : 300 }
+    ? { x: typeof window !== 'undefined' ? window.innerWidth / 2 : 600, y: typeof window !== 'undefined' ? window.innerHeight / 2 : 300 }
     : { x: 0, y: 0 });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +124,8 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
       height: MAP_H,
       zoom,
       borderRadius: mapBR,
+      sphericalCropFactor: Math.min(1, Math.max(0.5, 1 - (zoom - 1) * 0.25 - (isDragging ? 0.01 : 0))),
+      sphericalRefraction: inwardDistortion,
     });
 
     const refractionField = computeRefractionField({
@@ -153,7 +159,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
 
     // Interior zoom expands glyphs to fill the lens (1st screenshot).
     // The frog/capsule look is rim refraction only — disable zoom when ~1×.
-    const computedZoomScale = zoom <= 1.02
+    const computedZoomScale = zoom <= 1.02 && inwardDistortion <= 0
       ? 0
       : Math.max(2, 2.0 * zoomResult.maximumDisplacement);
     const computedRimScale  = Math.max(2, 2.0 * rimResult.maximumDisplacement);
@@ -174,7 +180,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
       rimScale: rimScaleFrac,
       padPercent,
     };
-  }, [actualWidth, actualHeight, actualBR, zoom, bezelThickness, ior, specularOpacity, specularSaturation, distortion, specularAngle, MAP_W, MAP_H, mapBR]);
+  }, [actualWidth, actualHeight, actualBR, zoom, inwardDistortion, bezelThickness, ior, specularOpacity, specularSaturation, distortion, specularAngle, MAP_W, MAP_H, mapBR, isDragging]);
 
   // ── 2. Fluid Drag Handlers ──────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -240,10 +246,10 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
           overflow: 'hidden',
           backdropFilter: `url(#${filterId})`,
           WebkitBackdropFilter: `url(#${filterId})`,
-          background: 'rgba(255, 255, 255, 0.07)',
+          background: 'rgba(255, 255, 255, 0.12)',
           boxShadow: isDragging
             ? '0 24px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.45), inset 0 2px 8px rgba(255, 255, 255, 0.55), inset 0 -2px 6px rgba(0, 0, 0, 0.2)'
-            : '0 8px 28px rgba(0, 0, 0, 0.32), inset 0 0 0 0.5px rgba(255, 255, 255, 0.42), inset 0 1px 4px rgba(255, 255, 255, 0.5), inset 0 -1px 4px rgba(0, 0, 0, 0.18)',
+            : '0 8px 28px rgba(0, 0, 0, 0.24), inset 0 0 0 0.5px rgba(255, 255, 255, 0.55), inset 0 1px 4px rgba(255, 255, 255, 0.65), inset 0 -1px 4px rgba(0, 0, 0, 0.08)',
           transition: 'box-shadow 0.2s ease',
         }}
       />

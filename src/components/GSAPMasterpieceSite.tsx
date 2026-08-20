@@ -13,6 +13,7 @@ export const GSAPMasterpieceSite: React.FC = () => {
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showCanvasLens, setShowCanvasLens] = useState(false);
+  const [showMagnifyingGlass, setShowMagnifyingGlass] = useState(false);
 
   useEffect(() => {
     setShowLab(new URLSearchParams(window.location.search).has('lab'));
@@ -48,10 +49,12 @@ export const GSAPMasterpieceSite: React.FC = () => {
           showRightSidebar={showRightSidebar}
           showLeftSidebar={showLeftSidebar}
           showCanvasLens={showCanvasLens}
+          showMagnifyingGlass={showMagnifyingGlass}
           onToggleNavbar={() => setShowNavbar(!showNavbar)}
           onToggleRightSidebar={() => setShowRightSidebar(!showRightSidebar)}
           onToggleLeftSidebar={() => setShowLeftSidebar(!showLeftSidebar)}
           onToggleCanvasLens={() => setShowCanvasLens(!showCanvasLens)}
+          onToggleMagnifyingGlass={() => setShowMagnifyingGlass(!showMagnifyingGlass)}
         />
         {showLab && (
           <div style={{ marginTop: 48 }}>

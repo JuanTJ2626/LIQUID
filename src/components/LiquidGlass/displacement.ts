@@ -335,10 +335,12 @@ export interface ZoomMapOptions {
   height: number;
   zoom: number;
   borderRadius?: number;
+  sphericalCropFactor?: number;
+  sphericalRefraction?: number;
 }
 
 export function generateZoomDisplacementMap(opts: ZoomMapOptions): DisplacementMapResult {
-  const { width, height, zoom, borderRadius } = opts;
+  const { width, height, zoom, borderRadius, sphericalCropFactor, sphericalRefraction } = opts;
   const br = borderRadius ?? Math.min(width, height) / 2;
   const cx = width / 2;
   const cy = height / 2;
@@ -347,7 +349,12 @@ export function generateZoomDisplacementMap(opts: ZoomMapOptions): DisplacementM
   const zoomFactor = Math.max(1.0, zoom);
   // Max displacement of f(r) = r * (1 - 1/Z) * (1 - r^2/R^2) occurs at r = R / sqrt(3)
   // f(r_max) = R * (2 / (3 * sqrt(3))) * (1 - 1/Z) ≈ 0.385 * radius * (1 - 1/Z)
-  const maxZoomShiftPx = 0.385 * radius * (1.0 - 1.0 / zoomFactor);
+  const canvasLike = sphericalCropFactor !== undefined;
+  const cropFactor = Math.max(0.1, Math.min(1, sphericalCropFactor ?? 1 / zoomFactor));
+  const refraction = Math.max(0, sphericalRefraction ?? 0);
+  const maxZoomShiftPx = canvasLike
+    ? radius * (1 - cropFactor + cropFactor * refraction)
+    : 0.385 * radius * (1.0 - 1.0 / zoomFactor);
   const cacheKey = `zoom_${width}x${height}_z${zoom.toFixed(2)}_r${br}`;
 
   if (typeof document === 'undefined') {
@@ -386,10 +393,23 @@ export function generateZoomDisplacementMap(opts: ZoomMapOptions): DisplacementM
         continue;
       }
 
-      // Smooth parabolic magnification field: 100% crisp, uniform, and unsquished
-      const factor = (1.0 / zoomFactor - 1.0) * (1.0 - normRadius * normRadius);
-      const dispX = relX * factor;
-      const dispY = relY * factor;
+      let dispX: number;
+      let dispY: number;
+
+      if (canvasLike) {
+        const edgeThreshold = 0.40;
+        const edgeT = normRadius > edgeThreshold
+          ? (normRadius - edgeThreshold) / (1.0 - edgeThreshold)
+          : 0;
+        const edgeDisplacement = Math.pow(edgeT, 2.5) * refraction;
+        const sampleScale = cropFactor * (1.0 - edgeDisplacement);
+        dispX = relX * (sampleScale - 1.0);
+        dispY = relY * (sampleScale - 1.0);
+      } else {
+        const factor = (1.0 / zoomFactor - 1.0) * (1.0 - normRadius * normRadius);
+        dispX = relX * factor;
+        dispY = relY * factor;
+      }
 
       const maxDenom = maxZoomShiftPx || 1;
       const rVal = Math.round(Math.max(0, Math.min(255, 128 + (dispX / maxDenom) * 127)));

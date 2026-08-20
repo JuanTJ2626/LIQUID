@@ -26,9 +26,12 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   
   // Centro de la lupa en coordenadas de pantalla
-  const [lensCenter, setLensCenter] = useState({ x: 0, y: 0 });
+  const lensCenterRef = useRef({ x: 0, y: 0 });
   
   const animationFrameRef = useRef<number>();
+  const captureTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const captureInProgressRef = useRef(false);
+  const capturePendingRef = useRef(false);
 
   // ── Handlers de drag ──
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -99,6 +102,12 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
 
     // Render source canvas (captura del DOM real usando html2canvas)
     const renderSourceCanvas = async () => {
+      if (captureInProgressRef.current) {
+        capturePendingRef.current = true;
+        return;
+      }
+
+      captureInProgressRef.current = true;
       try {
         // Importar html2canvas dinámicamente
         const html2canvas = (await import('html2canvas')).default;
@@ -116,7 +125,7 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
           useCORS: true,
           allowTaint: false, // Optimización: más estricto pero más rápido
           backgroundColor: '#0a0a0f',
-          scale: window.devicePixelRatio || 1,
+          scale: 0.5,
           logging: false,
           removeContainer: true, // Optimización: limpiar el contenedor temporal
           // Ignorar los canvas de la lupa para evitar recursión
@@ -140,6 +149,12 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
         const h = window.innerHeight;
         sourceCtx.fillStyle = '#0a0a0f';
         sourceCtx.fillRect(0, 0, w, h);
+      } finally {
+        captureInProgressRef.current = false;
+        if (capturePendingRef.current) {
+          capturePendingRef.current = false;
+          void renderSourceCanvas();
+        }
       }
     };
 
@@ -150,8 +165,8 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
       const height = lensHeight;
 
       // Calcular el centro de la lupa en coordenadas de pantalla
-      const sourceCenterX = (lensCenter.x) * dpr;
-      const sourceCenterY = (lensCenter.y) * dpr;
+      const sourceCenterX = lensCenterRef.current.x * dpr;
+      const sourceCenterY = lensCenterRef.current.y * dpr;
 
       const magFactor = 0.60;
       const cropWidth = lensWidth * dpr * magFactor;
@@ -332,7 +347,20 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
 
     const handleResize = () => {
       resizeCanvases();
-      renderSourceCanvas();
+      scheduleCapture();
+    };
+
+    const handleScroll = () => {
+      scheduleCapture();
+    };
+
+    const scheduleCapture = () => {
+      if (captureTimeoutRef.current) {
+        clearTimeout(captureTimeoutRef.current);
+      }
+      captureTimeoutRef.current = setTimeout(() => {
+        void renderSourceCanvas();
+      }, 250);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -355,20 +383,21 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
     // Posición inicial centrada en pantalla
     const initialX = window.innerWidth / 2;
     const initialY = window.innerHeight / 2;
-    setLensCenter({ x: initialX, y: initialY });
+    lensCenterRef.current = { x: initialX, y: initialY };
 
-    // Capturar el DOM inicial y comenzar el render loop
-    renderSourceCanvas().then(() => {
-      render();
-    });
+    sourceCtx.fillStyle = '#0a0a0f';
+    sourceCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    render();
+    void renderSourceCanvas();
 
     // Recapturar el DOM cada 3 segundos (optimizado de 2 a 3 para mejor rendimiento)
     const captureInterval = setInterval(() => {
-      renderSourceCanvas();
+      void renderSourceCanvas();
     }, 3000);
 
     // Add event listeners
     window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
@@ -376,17 +405,21 @@ export const CanvasSphericalLens: React.FC<CanvasSphericalLensProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
       clearInterval(captureInterval);
+      if (captureTimeoutRef.current) {
+        clearTimeout(captureTimeoutRef.current);
+      }
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [lensWidth, lensHeight, zoomLevel, refractionLevel, lensCenter]);
+  }, [lensWidth, lensHeight, zoomLevel, refractionLevel]);
 
   // Actualizar el centro de la lupa cuando se arrastra
   useEffect(() => {
     // Calcular la posición del centro basado en la posición del contenedor
     const centerX = window.innerWidth / 2 + pos.x;
     const centerY = window.innerHeight / 2 + pos.y;
-    setLensCenter({ x: centerX, y: centerY });
+    lensCenterRef.current = { x: centerX, y: centerY };
   }, [pos]);
 
   const borderRadiusStyle = `${lensHeight / 2}px`;
