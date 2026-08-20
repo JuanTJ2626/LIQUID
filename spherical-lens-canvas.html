@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Liquid Glass Lens — Canvas 2D Fisheye</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      cursor: none;
+    }
+
+    /* ── Contenedor de texto ── */
+    #scene {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #text-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6em;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .headline {
+      font-size: clamp(2.8rem, 7vw, 6rem);
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -0.03em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .subline {
+      font-size: clamp(1rem, 2.5vw, 2rem);
+      font-weight: 400;
+      color: #fff;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+    }
+
+    .body-text {
+      font-size: clamp(0.7rem, 1.4vw, 1.1rem);
+      font-weight: 400;
+      color: #ccc;
+      letter-spacing: 0.1em;
+      max-width: 640px;
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    /* Cuadrícula de fondo */
+    #scene::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── Canvas superpuesto (lupa interactiva) ── */
+    #lens-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 1000;
+      transform-origin: 0 0;
+    }
+
+    /* Canvas oculto para captura de origen — ocultado tras confirmación */
+    #source-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 1;
+    }
+
+    /* Cursor personalizado */
+    #crosshair {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 2000;
+      mix-blend-mode: difference;
+    }
+
+    /* Info overlay */
+    .info {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.3);
+      font: 11px/1.6 monospace;
+      text-align: center;
+      pointer-events: none;
+      letter-spacing: 0.08em;
+      z-index: 500;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Escena de texto ── -->
+<div id="scene">
+  <div id="text-layer">
+    <div class="headline">Optics Study</div>
+    <div class="subline">Liquid Glass Lens</div>
+    <p class="body-text">
+      Canvas-based spherical fisheye distortion.<br>
+      Direct ImageData manipulation at 60 FPS.<br>
+      No SVG filters — pure JavaScript rendering.
+    </p>
+    <br>
+    <p class="body-text" style="font-size:0.75em; color:#666;">
+      CANVAS 2D · FISHEYE · IMAGEDATA · REQUESTANIMATIONFRAME<br>
+      drawImage · getImageData · putImageData · Math.sin(r×π/2)
+    </p>
+  </div>
+</div>
+
+<!-- ── Canvas oculto (captura de origen del DOM) ── -->
+<canvas id="source-canvas"></canvas>
+
+<!-- ── Canvas visible (lupa interactiva) ── -->
+<canvas id="lens-canvas"></canvas>
+
+<!-- ── Cursor ── -->
+<div id="crosshair"></div>
+
+<!-- ── Info ── -->
+<div class="info">
+  Liquid Glass Capsule Lens &nbsp;|&nbsp; ${LENS_WIDTH}×${LENS_HEIGHT}px &nbsp;|&nbsp; Elliptic refraction &nbsp;|&nbsp; 60 FPS<br>
+  <span style="opacity: 0.6; font-size: 10px;">
+    REFRACTION: <span id="refraction-display">1.0</span> &nbsp; (↑↓ to adjust or console: setRefractionLevel(value))
+  </span>
+</div>
+
+<script>
+/**
+ * Canvas-Based Spherical Magnifying Lens
+ * 
+ * Arquitectura:
+ * 1. Captura el DOM (texto) en un canvas oculto usando html2canvas emulado simple
+ * 2. En cada frame, aplica transformación esférica pixel-by-pixel sobre ImageData
+ * 3. Renderiza la lupa circular con borde y sombra en el canvas visible
+ */
+
+(function () {
+  'use strict';
+
+  /* ─── Parámetros de la lupa ─────────────────────────────────── */
+  const LENS_WIDTH  = 280;       // ancho de la cápsula en px
+  const LENS_HEIGHT = 180;       // alto de la cápsula en px
+  const LENS_RX     = LENS_WIDTH / 2;
+  const LENS_RY     = LENS_HEIGHT / 2;
+  const ZOOM_LEVEL  = 1.6;       // magnificación (1.4 - 1.8 para zoom potente)
+  let REFRACTION_LEVEL = 1.0;    // fuerza de refracción (0.0 - 2.5)
+  
+  /* ─── Referencias DOM ──────────────────────────────────────── */
+  const sourceCanvas = document.getElementById('source-canvas');
+  const lensCanvas   = document.getElementById('lens-canvas');
+  const crosshair    = document.getElementById('crosshair');
+  const scene        = document.getElementById('scene');
+
+  const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+  const lensCtx   = lensCanvas.getContext('2d', { alpha: true });
+
+  // Offscreen canvas temporal para volcar ImageData
+  const offscreenCanvas = document.createElement('canvas');
+  const offscreenCtx = offscreenCanvas.getContext('2d');
+
+  /* ─── Estado del cursor ────────────────────────────────────── */
+  let mouseX = window.innerWidth  / 2;
+  let mouseY = window.innerHeight / 2;
+  let sourceMouseX = 0; // Coordenadas en píxeles reales del sourceCanvas
+  let sourceMouseY = 0;
+
+  /* ─── Actualizar coordenadas del cursor (con DPR) ──────────── */
+  function updateMouseCoordinates(e) {
+    const rect = sourceCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    
+    // Coordenadas de viewport (para renderizar la lupa)
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    
+    // Coordenadas exactas en píxeles reales del canvas de origen
+    sourceMouseX = (e.clientX - rect.left) * dpr;
+    sourceMouseY = (e.clientY - rect.top) * dpr;
+  }
+
+  /* ─── Setup Canvas ─────────────────────────────────────────── */
+  function resizeCanvases() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    
+    // Canvas visible (lupa) - tamaño de la cápsula
+    lensCanvas.width  = LENS_WIDTH * dpr;
+    lensCanvas.height = LENS_HEIGHT * dpr;
+    lensCanvas.style.width  = `${LENS_WIDTH}px`;
+    lensCanvas.style.height = `${LENS_HEIGHT}px`;
+    lensCtx.scale(dpr, dpr);
+
+    // Canvas oculto (captura DOM) - tamaño completo de viewport
+    sourceCanvas.width  = w * dpr;
+    sourceCanvas.height = h * dpr;
+    sourceCanvas.style.width  = `${w}px`;
+    sourceCanvas.style.height = `${h}px`;
+    sourceCtx.scale(dpr, dpr);
+
+    // Offscreen canvas - mismo tamaño que lensCanvas
+    offscreenCanvas.width  = LENS_WIDTH;
+    offscreenCanvas.height = LENS_HEIGHT;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  RENDERIZADO DEL SOURCE CANVAS
+   *  Pinta el texto explícitamente con fuentes del sistema
+   * ═══════════════════════════════════════════════════════════════ */
+  function renderSourceCanvas() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    // ── 1. FONDO NEGRO EXPLÍCITO ──
+    sourceCtx.fillStyle = '#000000';
+    sourceCtx.fillRect(0, 0, w, h);
+
+    // ── 2. CUADRÍCULA DE FONDO ──
+    sourceCtx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    sourceCtx.lineWidth = 1;
+    for (let x = 0; x < w; x += 40) {
+      sourceCtx.beginPath();
+      sourceCtx.moveTo(x, 0);
+      sourceCtx.lineTo(x, h);
+      sourceCtx.stroke();
+    }
+    for (let y = 0; y < h; y += 40) {
+      sourceCtx.beginPath();
+      sourceCtx.moveTo(0, y);
+      sourceCtx.lineTo(w, y);
+      sourceCtx.stroke();
+    }
+
+    // ── 3. TEXTO BLANCO EXPLÍCITO (fuentes del sistema como fallback) ──
+    sourceCtx.textAlign = 'center';
+    sourceCtx.textBaseline = 'middle';
+
+    // Headline
+    sourceCtx.fillStyle = '#FFFFFF';
+    sourceCtx.font = 'bold 70px Georgia, serif';
+    sourceCtx.fillText('OPTICS STUDY', cx, cy - 80);
+
+    // Subline
+    sourceCtx.fillStyle = '#FFFFFF';
+    sourceCtx.font = '400 24px Georgia, serif';
+    sourceCtx.fillText('LIQUID GLASS LENS', cx, cy - 20);
+
+    // Body text
+    sourceCtx.fillStyle = '#CCCCCC';
+    sourceCtx.font = '400 14px Georgia, serif';
+    sourceCtx.fillText('Canvas-based spherical fisheye distortion.', cx, cy + 40);
+    sourceCtx.fillText('Direct ImageData manipulation at 60 FPS.', cx, cy + 60);
+    sourceCtx.fillText('No SVG filters — pure JavaScript rendering.', cx, cy + 80);
+
+    // Technical details
+    sourceCtx.fillStyle = '#666666';
+    sourceCtx.font = '400 11px monospace';
+    sourceCtx.fillText('CANVAS 2D · FISHEYE · IMAGEDATA · REQUESTANIMATIONFRAME', cx, cy + 120);
+    sourceCtx.fillText('drawImage · getImageData · putImageData · Math.sin(r×π/2)', cx, cy + 135);
+
+    console.info('[SphericalLens] Source canvas rendered. Fonts loaded and text visible.');
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  TRANSFORMACIÓN BEZEL PROFILE DISPLACEMENT — Cápsula Stadium
+   * ═══════════════════════════════════════════════════════════════ */
+  function applySphericalDistortion() {
+    const dpr = window.devicePixelRatio || 1;
+    const width = LENS_WIDTH;
+    const height = LENS_HEIGHT;
+
+    // ── Centro EXACTO donde está el cursor (en píxeles reales del sourceCanvas) ──
+    const sourceCenterX = sourceMouseX;
+    const sourceCenterY = sourceMouseY;
+
+    // ── MAGNIFICACIÓN: Extraer región PEQUEÑA para agrandar la fuente ──
+    // Factor de magnificación: 0.6 = 60% del tamaño → texto aparece 1.67× más grande
+    const magFactor = 0.60;
+    const cropWidth = LENS_WIDTH * dpr * magFactor;
+    const cropHeight = LENS_HEIGHT * dpr * magFactor;
+    
+    // Esquina superior izquierda exacta de la extracción (centrada SIMÉTRICAMENTE en el cursor)
+    const startX = sourceCenterX - cropWidth / 2;
+    const startY = sourceCenterY - cropHeight / 2;
+    
+    // Clamp a los límites del canvas, pero mantener las dimensiones
+    const clampedStartX = Math.max(0, Math.floor(startX));
+    const clampedStartY = Math.max(0, Math.floor(startY));
+    const extractW = Math.min(sourceCanvas.width - clampedStartX, Math.ceil(cropWidth));
+    const extractH = Math.min(sourceCanvas.height - clampedStartY, Math.ceil(cropHeight));
+
+    const srcData = sourceCtx.getImageData(clampedStartX, clampedStartY, extractW, extractH);
+    const dstData = lensCtx.createImageData(width, height);
+
+    const srcPixels = srcData.data;
+    const dstPixels = dstData.data;
+
+    const w = extractW;
+    const h = extractH;
+    
+    // Centro GEOMÉTRICO del crop extraído
+    const rx = cropWidth / 2;
+    const ry = cropHeight / 2;
+
+    // ── BUCLE DE BEZEL PROFILE DISPLACEMENT ──
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dstIdx = (y * width + x) * 4;
+
+        // Mapear coordenadas de destino a coordenadas del crop (proporcionales)
+        const srcXScaled = (x / width) * cropWidth;
+        const srcYScaled = (y / height) * cropHeight;
+
+        // Normalización [-1, 1] respecto al centro GEOMÉTRICO del crop
+        const nx = (srcXScaled - rx) / rx;
+        const ny = (srcYScaled - ry) / ry;
+        const rNorm = Math.sqrt(nx * nx + ny * ny);
+
+        // Fuera de la cápsula: transparente
+        if (rNorm > 1.0) {
+          dstPixels[dstIdx]     = 0;
+          dstPixels[dstIdx + 1] = 0;
+          dstPixels[dstIdx + 2] = 0;
+          dstPixels[dstIdx + 3] = 0;
+          continue;
+        }
+
+        // ── BEZEL PROFILE: Centro estable (40%), compresión exponencial en bordes ──
+        const edgeThreshold = 0.40;
+        let displacement = 0;
+
+        if (rNorm > edgeThreshold) {
+          const t = (rNorm - edgeThreshold) / (1.0 - edgeThreshold);
+          displacement = Math.pow(t, 2.5) * 0.45 * REFRACTION_LEVEL;
+        }
+
+        const sampleDist = 1.0 - displacement;
+
+        // Muestreo SIMÉTRICO desde el centro: aplicar la distorsión desde rx, ry
+        const srcX = Math.floor(rx + (srcXScaled - rx) * sampleDist);
+        const srcY = Math.floor(ry + (srcYScaled - ry) * sampleDist);
+
+        // Copiar píxeles asegurando opacidad sólida
+        if (srcX >= 0 && srcX < w && srcY >= 0 && srcY < h) {
+          const srcIdx = (srcY * w + srcX) * 4;
+          dstPixels[dstIdx]     = srcPixels[srcIdx];     // R
+          dstPixels[dstIdx + 1] = srcPixels[srcIdx + 1]; // G
+          dstPixels[dstIdx + 2] = srcPixels[srcIdx + 2]; // B
+          dstPixels[dstIdx + 3] = 255;                    // A (opacidad 100%)
+        } else {
+          // Out of bounds: transparente
+          dstPixels[dstIdx]     = 0;
+          dstPixels[dstIdx + 1] = 0;
+          dstPixels[dstIdx + 2] = 0;
+          dstPixels[dstIdx + 3] = 0;
+        }
+      }
+    }
+
+    return dstData;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  RENDER LOOP (60 FPS) — Bezel Profile Liquid Glass
+   * ═══════════════════════════════════════════════════════════════ */
+  function render() {
+    const dpr = window.devicePixelRatio || 1;
+
+    // 1. Aplicar distorsión de bezel → ImageData
+    const lensData = applySphericalDistortion();
+
+    // 2. Volcar ImageData en el Canvas offscreen temporal
+    offscreenCtx.putImageData(lensData, 0, 0);
+
+    // 3. Limpiar el Canvas visible
+    lensCtx.clearRect(0, 0, lensCanvas.width, lensCanvas.height);
+
+    // 4. Aplicar clip STADIUM (roundRect con radio = altura/2)
+    const w = LENS_WIDTH;
+    const h = LENS_HEIGHT;
+    const r = h / 2;
+
+    lensCtx.save();
+    lensCtx.beginPath();
+    lensCtx.roundRect(0, 0, w, h, r);
+    lensCtx.clip();
+
+    // 5. Dibujar el canvas offscreen
+    lensCtx.drawImage(
+      offscreenCanvas,
+      0, 0, offscreenCanvas.width, offscreenCanvas.height,
+      0, 0, w, h
+    );
+
+    lensCtx.restore();
+
+    // 6. SOMBRA RADIAL INTERIOR PROFUNDA (profundidad de cristal negro)
+    lensCtx.save();
+    
+    const shadowGrad = lensCtx.createRadialGradient(
+      LENS_RX, LENS_RY, LENS_RY * 0.3,
+      LENS_RX, LENS_RY, LENS_RX
+    );
+    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    shadowGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.25)');
+    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0.70)');
+
+    lensCtx.beginPath();
+    lensCtx.roundRect(0, 0, w, h, r);
+    lensCtx.fillStyle = shadowGrad;
+    lensCtx.fill();
+
+    lensCtx.restore();
+
+    // 7. BISEL ESPECULAR EXTERIOR (trazo fino blanco)
+    lensCtx.save();
+
+    // Sombra flotante externa
+    lensCtx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    lensCtx.shadowBlur = 22;
+    lensCtx.shadowOffsetX = 0;
+    lensCtx.shadowOffsetY = 9;
+
+    lensCtx.beginPath();
+    lensCtx.roundRect(0, 0, w, h, r);
+    lensCtx.lineWidth = 1.5;
+    lensCtx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    lensCtx.stroke();
+
+    lensCtx.restore();
+
+    // 8. Reflejo especular sutil (opcional)
+    const grad = lensCtx.createRadialGradient(
+      w * 0.25, h * 0.22, 0,
+      LENS_RX, LENS_RY, Math.min(LENS_RX, LENS_RY) * 0.8
+    );
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+    grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.06)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    lensCtx.save();
+    lensCtx.beginPath();
+    lensCtx.roundRect(0, 0, w, h, r);
+    lensCtx.clip();
+    lensCtx.fillStyle = grad;
+    lensCtx.fillRect(0, 0, w, h);
+    lensCtx.restore();
+
+    // 9. Posicionar el canvas DOM centrado en el cursor
+    lensCanvas.style.transform = `translate(${mouseX - LENS_RX}px, ${mouseY - LENS_RY}px)`;
+
+    // 10. Actualizar display de refracción
+    const refractionDisplay = document.getElementById('refraction-display');
+    if (refractionDisplay) {
+      refractionDisplay.textContent = REFRACTION_LEVEL.toFixed(2);
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  CONTROL DE REFRACCIÓN EN TIEMPO REAL
+   * ═══════════════════════════════════════════════════════════════ */
+  
+  // Función global para ajustar el nivel de refracción
+  window.setRefractionLevel = function(value) {
+    REFRACTION_LEVEL = Math.max(0, Math.min(2.5, parseFloat(value) || 1.0));
+    console.info(`[SphericalLens] REFRACTION_LEVEL = ${REFRACTION_LEVEL.toFixed(2)}`);
+  };
+
+  // Control con teclas de flecha (ArrowUp / ArrowDown)
+  window.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      REFRACTION_LEVEL = Math.min(2.5, REFRACTION_LEVEL + 0.1);
+      console.info(`[SphericalLens] REFRACTION_LEVEL = ${REFRACTION_LEVEL.toFixed(2)} (↑)`);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      REFRACTION_LEVEL = Math.max(0, REFRACTION_LEVEL - 0.1);
+      console.info(`[SphericalLens] REFRACTION_LEVEL = ${REFRACTION_LEVEL.toFixed(2)} (↓)`);
+    }
+  });
+
+  /* ─── Event Listeners ───────────────────────────────────────── */
+  document.addEventListener('pointermove', function (e) {
+    updateMouseCoordinates(e);
+    crosshair.style.left = `${mouseX}px`;
+    crosshair.style.top  = `${mouseY}px`;
+  }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    resizeCanvases();
+    renderSourceCanvas();
+    updateMouseCoordinates({ clientX: mouseX, clientY: mouseY });
+  });
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  INICIALIZACIÓN — ESPERAR A LAS FUENTES
+   * ═══════════════════════════════════════════════════════════════ */
+  resizeCanvases();
+
+  // Inicializar coordenadas del mouse en el centro
+  updateMouseCoordinates({ 
+    clientX: window.innerWidth / 2, 
+    clientY: window.innerHeight / 2 
+  });
+
+  // Esperar a que las fuentes del documento terminen de cargar
+  document.fonts.ready.then(() => {
+    console.info('[SphericalLens] Fonts ready. Rendering source canvas...');
+    renderSourceCanvas();
+    render();
+  }).catch((err) => {
+    console.warn('[SphericalLens] document.fonts.ready error:', err);
+    // Fallback: renderizar de todas formas después de 100ms
+    setTimeout(() => {
+      renderSourceCanvas();
+      render();
+    }, 100);
+  });
+
+})();
+</script>
+</body>
+</html>

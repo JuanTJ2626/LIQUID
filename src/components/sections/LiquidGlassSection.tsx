@@ -72,10 +72,112 @@ const TRIPLET = [
   'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=900&q=85',
 ];
 
-export const LiquidGlassSection: React.FC = () => {
+export const LiquidGlassSection: React.FC<{
+  showNavbar?: boolean;
+  showRightSidebar?: boolean;
+  showLeftSidebar?: boolean;
+  showCanvasLens?: boolean;
+  onToggleNavbar?: () => void;
+  onToggleRightSidebar?: () => void;
+  onToggleLeftSidebar?: () => void;
+  onToggleCanvasLens?: () => void;
+}> = ({ 
+  showNavbar = false,
+  showRightSidebar = false,
+  showLeftSidebar = false,
+  showCanvasLens = false,
+  onToggleNavbar,
+  onToggleRightSidebar,
+  onToggleLeftSidebar,
+  onToggleCanvasLens,
+}) => {
   const [specularOpacity, setSpecularOpacity] = useState(0.85);
   const [specularSaturation, setSpecularSaturation] = useState(0);
   const [distortion, setDistortion] = useState(0.9);
+
+  // Componente para un toggle individual
+  const ToggleButton = ({ 
+    label, 
+    sublabel, 
+    checked, 
+    onChange, 
+    color = '#10b981' 
+  }: { 
+    label: string; 
+    sublabel: string; 
+    checked: boolean; 
+    onChange: () => void; 
+    color?: string;
+  }) => (
+    <label style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: 12,
+      cursor: 'pointer',
+      userSelect: 'none',
+      padding: '12px 16px',
+      background: checked ? 'rgba(255,255,255,0.03)' : 'transparent',
+      borderRadius: 12,
+      border: `1px solid ${checked ? color : 'rgba(255,255,255,0.06)'}`,
+      transition: 'all 0.3s ease',
+    }}>
+      <input 
+        type="checkbox" 
+        checked={checked}
+        onChange={onChange}
+        style={{
+          width: 44,
+          height: 24,
+          appearance: 'none',
+          background: checked ? color : 'rgba(255,255,255,0.08)',
+          borderRadius: 9999,
+          position: 'relative',
+          cursor: 'pointer',
+          transition: 'background 0.3s ease',
+          border: '2px solid rgba(255,255,255,0.05)',
+          flexShrink: 0,
+        }}
+      />
+      <style>
+        {`
+          input[type="checkbox"]::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+          }
+          input[type="checkbox"]:checked::before {
+            transform: translateX(20px);
+          }
+        `}
+      </style>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ 
+          fontSize: '0.8rem', 
+          fontWeight: 700, 
+          color: checked ? color : 'rgba(255,255,255,0.7)',
+          letterSpacing: '0.06em',
+          transition: 'color 0.3s ease',
+        }}>
+          {checked ? '● ' : '○ '}{label}
+        </span>
+        <span style={{ 
+          fontSize: '0.65rem', 
+          fontWeight: 600, 
+          color: 'rgba(255,255,255,0.35)',
+          letterSpacing: '0.06em',
+        }}>
+          {sublabel}
+        </span>
+      </div>
+    </label>
+  );
 
   return (
     <section id="liquid-glass" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -99,9 +201,73 @@ export const LiquidGlassSection: React.FC = () => {
             <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.92rem', lineHeight: 1.65, margin: '0 0 16px 0' }}>
               Drag the capsule to bend the page. A compact SVG displacement rig that refracts whatever sits beneath it.
             </p>
-            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.92rem', lineHeight: 1.65, margin: 0 }}>
+            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.92rem', lineHeight: 1.65, margin: '0 0 24px 0' }}>
               Sweep across strong edges — high contrast makes the bend snap.
             </p>
+
+            {/* Toggles individuales para cada elemento Liquid Glass */}
+            <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ 
+                fontSize: '0.68rem', 
+                letterSpacing: '0.20em', 
+                textTransform: 'uppercase', 
+                color: 'rgba(255,255,255,0.4)', 
+                fontWeight: 800,
+                marginBottom: 16,
+              }}>
+                LIQUID GLASS ELEMENTS
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {onToggleNavbar && (
+                  <ToggleButton 
+                    label="NAVBAR"
+                    sublabel="Top draggable bar"
+                    checked={showNavbar}
+                    onChange={onToggleNavbar}
+                    color="#3b82f6"
+                  />
+                )}
+                {onToggleRightSidebar && (
+                  <ToggleButton 
+                    label="RIGHT PANEL"
+                    sublabel="Menu sidebar"
+                    checked={showRightSidebar}
+                    onChange={onToggleRightSidebar}
+                    color="#8b5cf6"
+                  />
+                )}
+                {onToggleLeftSidebar && (
+                  <ToggleButton 
+                    label="LEFT PANEL"
+                    sublabel="Info sidebar"
+                    checked={showLeftSidebar}
+                    onChange={onToggleLeftSidebar}
+                    color="#ec4899"
+                  />
+                )}
+                {onToggleCanvasLens && (
+                  <ToggleButton 
+                    label="CANVAS LENS"
+                    sublabel="Spherical magnifier"
+                    checked={showCanvasLens}
+                    onChange={onToggleCanvasLens}
+                    color="#10b981"
+                  />
+                )}
+              </div>
+
+              <p style={{ 
+                color: 'rgba(255,255,255,0.45)', 
+                fontSize: '0.7rem', 
+                lineHeight: 1.6, 
+                margin: '16px 0 0 0',
+                fontStyle: 'italic',
+                textAlign: 'center',
+              }}>
+                Toggle each element individually to explore Liquid Glass UI
+              </p>
+            </div>
           </div>
           <div style={{ position: 'relative', width: '100%', height: 420, borderRadius: 16, overflow: 'hidden', background: '#121216', boxShadow: '0 12px 40px rgba(0,0,0,0.5)' }}>
             <img src="/rana.png" alt="Frog" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Liquid Glass Lens — Spherical Displacement Map</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      cursor: none; /* ocultamos cursor nativo dentro del área */
+    }
+
+    /* ── Contenedor de texto ── */
+    #scene {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #text-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6em;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .headline {
+      font-size: clamp(2.8rem, 7vw, 6rem);
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: -0.03em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    .subline {
+      font-size: clamp(1rem, 2.5vw, 2rem);
+      font-weight: 400;
+      color: #fff;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+    }
+
+    .body-text {
+      font-size: clamp(0.7rem, 1.4vw, 1.1rem);
+      font-weight: 400;
+      color: #ccc;
+      letter-spacing: 0.1em;
+      max-width: 640px;
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    /* Cuadrícula de fondo tipo papel milimetrado para resaltar el efecto */
+    #scene::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── Lupa (wrapper posicionado) ── */
+    #lens-wrapper {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* Circulo perfecto — sombras SOLO en borde periférico */
+    #lens {
+      position: absolute;
+      border-radius: 50%;
+      clip-path: circle(50%);
+      overflow: hidden;
+      pointer-events: none;
+      will-change: transform;
+
+      /* Origen de transformación centrado exactamente */
+      transform-origin: center center;
+
+      /* Posicionamiento de fondo centrado */
+      background-position: center center;
+      background-size: contain;
+
+      /* Capa de cristal real: fondo semitransparente + backdrop que aplica el filtro SVG */
+      background-color: rgba(255, 255, 255, 0.03);
+      backdrop-filter: url(#spherical-lens);
+      -webkit-backdrop-filter: url(#spherical-lens);
+
+      /* Sombras reducidas SOLO en borde — sin inset oscuros en el centro */
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.15),           /* borde exterior sutil */
+        0 8px 16px rgba(0, 0, 0, 0.35),                 /* sombra flotante reducida */
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1);      /* brillo periférico muy reducido */
+
+      transition: box-shadow 0.15s ease, transform 0.04s linear;
+    }
+
+    /* Reflejo especular estático como pseudo-elemento — opacidad muy reducida */
+    #lens::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(
+        ellipse 60% 40% at 35% 25%,
+        rgba(255, 255, 255, 0.25) 0%,
+        rgba(255, 255, 255, 0.08) 30%,
+        transparent 65%
+      );
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Tinte de vidrio muy sutil */
+    #lens::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(
+        circle at 50% 50%,
+        rgba(200, 230, 255, 0.02) 0%,
+        transparent 70%
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* SVG invisible — solo contiene las defs del filtro */
+    #filter-host {
+      position: fixed;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+      pointer-events: none;
+      top: 0;
+      left: 0;
+    }
+
+    /* cursor custom (puntero de mira) */
+    #crosshair {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 2000;
+      mix-blend-mode: difference;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Escena de texto ── -->
+<div id="scene">
+  <div id="text-layer">
+    <div class="headline">Optics Study</div>
+    <div class="subline">Liquid Glass Lens</div>
+    <p class="body-text">
+      Spherical displacement map generated on Canvas 2D.<br>
+      The fisheye profile encodes ∇ sphere onto R/G channels.<br>
+      SVG feDisplacementMap reads the texture at 60 FPS.
+    </p>
+    <br>
+    <p class="body-text" style="font-size:0.75em; color:#666;">
+      REFRACTION · SNELL'S LAW · SURFACE NORMAL · CANVAS API<br>
+      feDisplacementMap · feGaussianBlur · feComposite · sRGB
+    </p>
+  </div>
+</div>
+
+<!-- ── SVG Filter Host ── -->
+<svg id="filter-host" aria-hidden="true">
+  <defs>
+    <!--
+      Pipeline:
+        feImage  (displacement map desde Canvas)
+        feDisplacementMap  scale=80 R→X G→Y
+        feGaussianBlur sutil para suavizar el borde de la lente (anti-aliasing óptico)
+        feComposite atop para boundary crisp
+    -->
+    <filter
+      id="spherical-lens"
+      x="-50%"
+      y="-50%"
+      width="200%"
+      height="200%"
+      filterUnits="objectBoundingBox"
+      primitiveUnits="userSpaceOnUse"
+      color-interpolation-filters="sRGB"
+    >
+      <!-- 1. Cargar el mapa de desplazamiento esférico centrado explícitamente -->
+      <feImage
+        id="fe-disp-image"
+        result="dispMap"
+        x="0"
+        y="0"
+        width="100%"
+        height="100%"
+        preserveAspectRatio="none"
+      />
+
+      <!-- 2. Desplazamiento esférico principal: R→X, G→Y -->
+      <feDisplacementMap
+        in="SourceGraphic"
+        in2="dispMap"
+        scale="55"
+        xChannelSelector="R"
+        yChannelSelector="G"
+        result="displaced"
+      />
+
+      <!-- 3. Blur óptico mínimo en el anillo exterior -->
+      <feGaussianBlur in="displaced" stdDeviation="0.4" result="blurred" />
+
+      <!-- 4. Composite atop: recorte limpio al shape del source -->
+      <feComposite in="blurred" in2="SourceGraphic" operator="atop" result="final" />
+
+    </filter>
+  </defs>
+</svg>
+
+<!-- ── Lupa DOM ── -->
+<div id="lens-wrapper">
+  <div id="lens"></div>
+</div>
+
+<!-- ── Cursor ── -->
+<div id="crosshair"></div>
+
+<script>
+/**
+ * Spherical Lens Displacement Map Generator + Controller
+ *
+ * Técnica exacta:
+ *   1. Canvas 2D genera un texture circular con perfil esférico.
+ *   2. Fuera del círculo: RGB(128, 128, 0) = neutral en X/Y, 0 en B.
+ *      (El spec pide #808000 = neutral para feDisplacementMap).
+ *   3. Dentro del círculo: encode del vector de desplazamiento.
+ *      R = 128 + dx_normalizado * 127  (desplazamiento X)
+ *      G = 128 + dy_normalizado * 127  (desplazamiento Y)
+ *   4. Perfil de esfera: offset = sin(r * PI/2) donde r=0..1.
+ */
+
+(function () {
+  'use strict';
+
+  /* ─── Parámetros de la lupa ─────────────────────────────────── */
+  const LENS_SIZE   = 200;       // diámetro en px
+  const LENS_R      = LENS_SIZE / 2;
+  const MAP_SIZE    = 200;       // MISMO tamaño que la lupa (1:1 pixel mapping)
+  const MAP_R       = MAP_SIZE / 2;
+  const DISP_SCALE  = 55;        // scale en feDisplacementMap (px) — REDUCIDO a rango 40-70
+  const INTENSITY   = 1.0;       // amplitud del desplazamiento (0..1)
+  const K_SPHERE    = 0.95;      // factor de refracción esférica (0 = lineal, 1 = tope esfera)
+
+  /* ─── Referencias DOM ──────────────────────────────────────── */
+  const lens      = document.getElementById('lens');
+  const feImg     = document.getElementById('fe-disp-image');
+  const crosshair = document.getElementById('crosshair');
+
+  /* ─── Tamaño de la lupa ────────────────────────────────────── */
+  lens.style.width  = `${LENS_SIZE}px`;
+  lens.style.height = `${LENS_SIZE}px`;
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  PASO 1: Generar el mapa de desplazamiento esférico en Canvas
+   * ═══════════════════════════════════════════════════════════════ */
+  function generateSphericalDisplacementMap() {
+    const canvas = document.createElement('canvas');
+    canvas.width  = MAP_SIZE;
+    canvas.height = MAP_SIZE;
+    const ctx  = canvas.getContext('2d');
+    const imgData = ctx.createImageData(MAP_SIZE, MAP_SIZE);
+    const data    = imgData.data;
+
+    const cx = MAP_SIZE / 2;
+    const cy = MAP_SIZE / 2;
+    const radius = MAP_SIZE / 2;
+
+    let maxDisp = 0; // para debug
+
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const idx = (y * MAP_SIZE + x) * 4;
+
+        /* ── CORRECCIÓN VECTORIAL SIMÉTRICA ── */
+        // Dirección desde el centro (cx, cy) hacia el píxel (x, y)
+        let dx = (x - cx) / radius;   // normalizado -1..+1
+        let dy = (y - cy) / radius;   // normalizado -1..+1
+
+        // Distancia radial normalizada [0..1]
+        let dist = Math.sqrt(dx * dx + dy * dy);
+
+        /* ── Fuera de la lente: neutral puro RGB(128, 128, 0) ── */
+        if (dist >= 1.0) {
+          data[idx]     = 128; // R neutral
+          data[idx + 1] = 128; // G neutral
+          data[idx + 2] = 0;   // B = 0
+          data[idx + 3] = 255;
+          continue;
+        }
+
+        /* ── En el centro exacto: 0 desplazamiento ── */
+        if (dist < 1e-6) {
+          data[idx]     = 128; // R = 128 → Δx = 0
+          data[idx + 1] = 128; // G = 128 → Δy = 0
+          data[idx + 2] = 128;
+          data[idx + 3] = 255;
+          continue;
+        }
+
+        /* ── Vector unitario normalizado con signo (positivo/negativo) ── */
+        let nx = dx / dist;  // componente X normalizado
+        let ny = dy / dist;  // componente Y normalizado
+
+        /* ── Perfil de distorsión esférica no lineal ── */
+        const distortion = Math.pow(dist, 2.5);
+
+        /* ── Fade suave en el borde ── */
+        const edgeFade = dist < 0.92
+          ? 1.0
+          : 1.0 - smoothstep(0.92, 1.0, dist);
+
+        const finalDistortion = distortion * edgeFade * INTENSITY;
+        if (finalDistortion > maxDisp) maxDisp = finalDistortion;
+
+        /* ── Desplazamiento vectorial: HACIA el centro (negativo) ── */
+        const dispX = -nx * finalDistortion;  // negativo para magnificar (lupa)
+        const dispY = -ny * finalDistortion;
+
+        /* ── Encoding exacto con signo: 128 + (desplazamiento × 127) ── */
+        // dispX, dispY ∈ [-1, +1] → R, G ∈ [1, 255]
+        const R = Math.round(Math.max(0, Math.min(255, 128 + dispX * 127)));
+        const G = Math.round(Math.max(0, Math.min(255, 128 + dispY * 127)));
+
+        data[idx]     = R;
+        data[idx + 1] = G;
+        data[idx + 2] = 128; // B neutral
+        data[idx + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+
+    console.info(`[SphericalLens] Displacement map generated. MAP_SIZE=${MAP_SIZE}, maxDisp=${maxDisp.toFixed(3)}, INTENSITY=${INTENSITY}`);
+
+    return canvas.toDataURL('image/png');
+  }
+
+  /* Smoothstep estándar de GLSL */
+  function smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  PASO 2: Inyectar el data URL en el feImage del filtro SVG
+   * ═══════════════════════════════════════════════════════════════ */
+  const dispMapDataUrl = generateSphericalDisplacementMap();
+  feImg.setAttribute('href', dispMapDataUrl);
+  feImg.setAttribute('xlink:href', dispMapDataUrl); // compatibilidad Safari
+
+  /* ═══════════════════════════════════════════════════════════════
+   *  PASO 3: Tracking del cursor a 60 FPS con pointermove
+   * ═══════════════════════════════════════════════════════════════ */
+  let mouseX = window.innerWidth  / 2;
+  let mouseY = window.innerHeight / 2;
+  let rafId  = null;
+  let dirty  = false;
+
+  /* Actualización del DOM solo cuando hay cambio (dirty flag) */
+  function renderFrame() {
+    if (dirty) {
+      // Posiciona la lupa centrada en el cursor
+      lens.style.transform      = `translate(${mouseX - LENS_R}px, ${mouseY - LENS_R}px)`;
+      crosshair.style.transform = `translate(${mouseX - 5}px, ${mouseY - 5}px)`;
+      dirty = false;
+    }
+    rafId = requestAnimationFrame(renderFrame);
+  }
+
+  document.addEventListener('pointermove', function (e) {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    dirty  = true;
+  }, { passive: true });
+
+  /* Arranca el loop de render */
+  renderFrame();
+
+  /* ── Efecto de escala al hacer clic ── */
+  document.addEventListener('pointerdown', function () {
+    lens.style.transform = `translate(${mouseX - LENS_R}px, ${mouseY - LENS_R}px) scale(1.05)`;
+    lens.style.boxShadow = `
+      0 0 0 1px rgba(255, 255, 255, 0.25),
+      0 10px 20px rgba(0, 0, 0, 0.45),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.15)
+    `;
+  });
+
+  document.addEventListener('pointerup', function () {
+    lens.style.boxShadow = `
+      0 0 0 1px rgba(255, 255, 255, 0.15),
+      0 8px 16px rgba(0, 0, 0, 0.35),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1)
+    `;
+  });
+
+  /* ── Mostrar info del mapa en pantalla ── */
+  const infoEl = document.createElement('div');
+  infoEl.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.3);
+    font: 11px/1.6 monospace;
+    text-align: center;
+    pointer-events: none;
+    letter-spacing: 0.08em;
+    z-index: 500;
+  `;
+  infoEl.innerHTML = `
+    MAP ${MAP_SIZE}×${MAP_SIZE}px &nbsp;|&nbsp;
+    LENS ⌀${LENS_SIZE}px &nbsp;|&nbsp;
+    feDisplacementMap scale=${DISP_SCALE} &nbsp;|&nbsp;
+    intensity=${INTENSITY} &nbsp;|&nbsp;
+    k=${K_SPHERE}<br>
+    R = 128 + Δx·127 &nbsp;&nbsp; G = 128 + Δy·127 &nbsp;&nbsp; offset = blend(fisheye, sin) × edgeFade
+  `;
+  document.body.appendChild(infoEl);
+
+})();
+</script>
+</body>
+</html>

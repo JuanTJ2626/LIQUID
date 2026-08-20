@@ -4,9 +4,15 @@ import { LiquidGlassSidebar } from './navigation/LiquidGlassSidebar';
 import { LiquidGlassLeftSidebar } from './navigation/LiquidGlassLeftSidebar';
 import { LiquidGlassSection } from './sections/LiquidGlassSection';
 import { LiquidGlassTestLab } from './LiquidGlass/LiquidGlassTestLab';
+import { CanvasSphericalLens } from './LiquidGlass/CanvasSphericalLens';
 
 export const GSAPMasterpieceSite: React.FC = () => {
   const [showLab, setShowLab] = useState(false);
+  // Estado individual para cada elemento liquid glass
+  const [showNavbar, setShowNavbar] = useState(false);
+  const [showRightSidebar, setShowRightSidebar] = useState(false);
+  const [showLeftSidebar, setShowLeftSidebar] = useState(false);
+  const [showCanvasLens, setShowCanvasLens] = useState(false);
 
   useEffect(() => {
     setShowLab(new URLSearchParams(window.location.search).has('lab'));
@@ -23,17 +29,30 @@ export const GSAPMasterpieceSite: React.FC = () => {
         overflow: 'hidden',
       }}
     >
-      {/* Navbar draggable */}
-      <LiquidGlassNavbar />
-
-      {/* Sidebar derecho — siempre visible y draggable */}
-      <LiquidGlassSidebar />
-
-      {/* Sidebar izquierdo — se expande con hover */}
-      <LiquidGlassLeftSidebar />
+      {/* Mostrar cada elemento según su estado individual */}
+      {showNavbar && <LiquidGlassNavbar />}
+      {showRightSidebar && <LiquidGlassSidebar />}
+      {showLeftSidebar && <LiquidGlassLeftSidebar />}
+      {showCanvasLens && (
+        <CanvasSphericalLens 
+          lensWidth={280}
+          lensHeight={180}
+          zoomLevel={1.6}
+          refractionLevel={1.0}
+        />
+      )}
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-        <LiquidGlassSection />
+        <LiquidGlassSection 
+          showNavbar={showNavbar}
+          showRightSidebar={showRightSidebar}
+          showLeftSidebar={showLeftSidebar}
+          showCanvasLens={showCanvasLens}
+          onToggleNavbar={() => setShowNavbar(!showNavbar)}
+          onToggleRightSidebar={() => setShowRightSidebar(!showRightSidebar)}
+          onToggleLeftSidebar={() => setShowLeftSidebar(!showLeftSidebar)}
+          onToggleCanvasLens={() => setShowCanvasLens(!showCanvasLens)}
+        />
         {showLab && (
           <div style={{ marginTop: 48 }}>
             <LiquidGlassTestLab />
