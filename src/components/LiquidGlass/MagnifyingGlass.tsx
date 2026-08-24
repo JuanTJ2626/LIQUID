@@ -138,7 +138,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
       height: MAP_H,
       zoom,
       borderRadius: mapBR,
-      sphericalCropFactor: Math.min(1, Math.max(0.5, 1 - (zoom - 1) * 0.25 - (isDragging ? 0.01 : 0))),
+      sphericalCropFactor: Math.min(1, Math.max(0.5, 1 - (zoom - 1) * 0.25)),
       sphericalRefraction: inwardDistortion,
     });
 
@@ -191,7 +191,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
       rimScale: computedRimScale,
       padPercent,
     };
-  }, [actualWidth, actualHeight, actualBR, zoom, inwardDistortion, bezelThickness, ior, specularOpacity, distortion, specularAngle, MAP_W, MAP_H, mapBR, isDragging]);
+  }, [actualWidth, actualHeight, actualBR, zoom, inwardDistortion, bezelThickness, ior, specularOpacity, distortion, specularAngle, MAP_W, MAP_H, mapBR]);
 
   // ── 2. Fluid Drag Handlers ──────────────────────────────────────────────────
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -254,47 +254,16 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
     if (Math.hypot(releaseVelocity.x, releaseVelocity.y) < 0.2) {
       setIsSettling(false);
       setBend({ rotate: 0, skewX: 0, skewY: 0 });
-      setClickScale(1.08);
+      setClickScale(1.03);
       clickScaleTimeoutRef.current = window.setTimeout(() => setClickScale(1), 150);
       dragRef.current = null;
       return;
     }
 
-    setIsSettling(true);
-    const maxX = fixed && typeof window !== 'undefined' ? window.innerWidth - actualWidth / 2 : Number.POSITIVE_INFINITY;
-    const minX = fixed ? actualWidth / 2 : Number.NEGATIVE_INFINITY;
-    const maxY = fixed && typeof window !== 'undefined' ? window.innerHeight - actualHeight / 2 : Number.POSITIVE_INFINITY;
-    const minY = fixed ? actualHeight / 2 : Number.NEGATIVE_INFINITY;
-
-    const settle = () => {
-      releaseVelocity.x *= 0.92;
-      releaseVelocity.y *= 0.92;
-      setPos((current) => {
-        let nextX = current.x + releaseVelocity.x;
-        let nextY = current.y + releaseVelocity.y;
-        if (nextX < minX || nextX > maxX) releaseVelocity.x *= -0.58;
-        if (nextY < minY || nextY > maxY) releaseVelocity.y *= -0.58;
-        nextX = Math.max(minX, Math.min(maxX, nextX));
-        nextY = Math.max(minY, Math.min(maxY, nextY));
-        return { x: nextX, y: nextY };
-      });
-      setBend((current) => ({
-        rotate: current.rotate * 0.78 + releaseVelocity.x * 0.025,
-        skewX: current.skewX * 0.78 + releaseVelocity.x * 0.05,
-        skewY: current.skewY * 0.78 + releaseVelocity.y * 0.03,
-      }));
-      if (Math.hypot(releaseVelocity.x, releaseVelocity.y) > 0.08) {
-        settleFrameRef.current = requestAnimationFrame(settle);
-      } else {
-        settleFrameRef.current = null;
-        setIsSettling(false);
-        setBend({ rotate: 0, skewX: 0, skewY: 0 });
-      }
-    };
-
-    settleFrameRef.current = requestAnimationFrame(settle);
+    setIsSettling(false);
+    setBend({ rotate: 0, skewX: 0, skewY: 0 });
     dragRef.current = null;
-  }, [actualHeight, actualWidth, fixed]);
+  }, []);
 
   const lensElement = (
     <div
@@ -317,8 +286,8 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
         overflow: 'hidden',
         isolation: 'isolate',
         transform: fixed
-          ? `translate(-50%, -50%) rotate(${bend.rotate}deg) skew(${bend.skewX}deg, ${bend.skewY}deg) scale(${isDragging ? (isPressed ? 0.96 : 1.04) : clickScale})`
-          : `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) rotate(${bend.rotate}deg) skew(${bend.skewX}deg, ${bend.skewY}deg) scale(${isDragging ? (isPressed ? 0.96 : 1.04) : clickScale})`,
+          ? `translate(-50%, -50%) scale(${isDragging ? 1.12 : clickScale})`
+          : `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) scale(${isDragging ? 1.12 : clickScale})`,
         cursor: isDragging ? 'grabbing' : 'grab',
         touchAction: 'none',
         userSelect: 'none',
@@ -347,8 +316,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
             : isHovered
               ? `0 14px ${38 + motionEnergy * 10}px rgba(0, 0, 0, 0.34), inset 0 0 0 ${1 + motionEnergy}px rgba(255, 255, 255, ${0.68 + motionEnergy * 0.12}), inset 0 1px ${6 + motionEnergy * 4}px rgba(255, 255, 255, 0.78), inset 0 -1px 5px rgba(0, 0, 0, 0.1)`
               : '0 8px 28px rgba(0, 0, 0, 0.24), inset 0 0 0 0.5px rgba(255, 255, 255, 0.55), inset 0 1px 4px rgba(255, 255, 255, 0.65), inset 0 -1px 4px rgba(0, 0, 0, 0.08)',
-          filter: `saturate(${1.02 + motionEnergy * 0.08}) contrast(${1.01 + motionEnergy * 0.03})`,
-          transition: 'box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1), filter 0.32s ease',
+          transition: 'box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       />
 
@@ -368,7 +336,7 @@ export const MagnifyingGlass: React.FC<MagnifyingGlassProps> = ({
           zoomMapUrl={zoomMapUrl}
           rimMapUrl={rimMapUrl}
           specMapUrl={specMapUrl}
-          zoomScale={zoomScale}
+          zoomScale={zoomScale * (isPressed ? 2 : 1)}
           rimScale={rimScale}
           padXPercent={padPercent}
           padYPercent={padPercent}

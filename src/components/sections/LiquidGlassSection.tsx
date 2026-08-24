@@ -92,6 +92,7 @@ export const LiquidGlassSection: React.FC<{
   onToggleMagnifyingGlass,
 }) => {
   const [specularOpacity, setSpecularOpacity] = useState(0.85);
+  const [lensWidth, setLensWidth] = useState(280);
   const [distortion, setDistortion] = useState(0.6);
   const [zoom, setZoom] = useState(1);
   const [inwardDistortion, setInwardDistortion] = useState(0.25);
@@ -274,7 +275,7 @@ export const LiquidGlassSection: React.FC<{
             <img src="/rana.png" alt="Frog" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
             {showMagnifyingGlass && (
               <MagnifyingGlass
-                fixed={true} width={280} height={180} borderRadius={9999}
+                fixed={true} width={lensWidth} height={Math.round(lensWidth * (180 / 280))} borderRadius={9999}
                 zoom={zoom} bezelThickness={22} ior={1.45}
                 inwardDistortion={inwardDistortion}
                 specularOpacity={specularOpacity}
@@ -285,6 +286,7 @@ export const LiquidGlassSection: React.FC<{
         </div>
         <div style={{ marginTop: 36, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: '0.68rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 700, marginBottom: 4 }}>PARAMETERS</div>
+          <Slider label="LENS SIZE" value={lensWidth} min={180} max={420} step={10} onChange={setLensWidth} />
           <Slider label="SPECULAR OPACITY" value={specularOpacity} min={0} max={1} step={0.01} onChange={setSpecularOpacity} />
           <Slider label="BUBBLE ZOOM" value={zoom} min={0} max={2} step={0.01} onChange={setZoom} />
           <Slider label="INWARD DISTORTION" value={inwardDistortion} min={0} max={1} step={0.01} onChange={setInwardDistortion} />
