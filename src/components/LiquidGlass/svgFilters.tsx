@@ -166,6 +166,8 @@ export const LiquidGlassSvgDefs: React.FC<LiquidGlassSvgDefsProps> = ({
 
 export interface LiquidGlassMagnifierSvgDefsProps {
   filterId: string;
+  width: number;
+  height: number;
   zoomMapUrl: string;
   rimMapUrl: string;
   specMapUrl?: string;
@@ -177,6 +179,8 @@ export interface LiquidGlassMagnifierSvgDefsProps {
 
 export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsProps> = ({
   filterId,
+  width,
+  height,
   zoomMapUrl,
   rimMapUrl,
   specMapUrl,
@@ -195,24 +199,18 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
       <defs>
         <filter
           id={filterId}
-          x={`-${padXPercent}%`}
-          y={`-${padYPercent}%`}
-          width={`${100 + 2 * padXPercent}%`}
-          height={`${100 + 2 * padYPercent}%`}
-          filterUnits="objectBoundingBox"
-          primitiveUnits="objectBoundingBox"
+          x={-(width * padXPercent) / 100}
+          y={-(height * padYPercent) / 100}
+          width={width * (1 + (2 * padXPercent) / 100)}
+          height={height * (1 + (2 * padYPercent) / 100)}
+          filterUnits="userSpaceOnUse"
+          primitiveUnits="userSpaceOnUse"
           colorInterpolationFilters="sRGB"
         >
-          {/*
-            EXPERIMENT: primitiveUnits=objectBoundingBox so feImage 0..1
-            covers the lens box, not the padded filter region / 0×0 SVG viewport.
-            scale is still in px from MagnifyingGlass — in this mode it is
-            bbox-relative (will look stronger). Isolated alignment test only.
-          */}
           <feImage
             href={zoomMapUrl}
             xlinkHref={zoomMapUrl}
-            x="0" y="0" width="1" height="1"
+            x="0" y="0" width={width} height={height}
             result="zoomMap"
             preserveAspectRatio="none"
           />
@@ -228,7 +226,7 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
           <feImage
             href={rimMapUrl}
             xlinkHref={rimMapUrl}
-            x="0" y="0" width="1" height="1"
+            x="0" y="0" width={width} height={height}
             result="rimMap"
             preserveAspectRatio="none"
           />
@@ -255,7 +253,7 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
               <feImage
                 href={specMapUrl}
                 xlinkHref={specMapUrl}
-                x="0" y="0" width="1" height="1"
+                x="0" y="0" width={width} height={height}
                 result="specMap"
                 preserveAspectRatio="none"
               />
@@ -268,11 +266,11 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
             </>
           )}
 
-          {/* 5. Final Composite to keep crisp bounds */}
-          <feComposite
+          {/* Keep the refracted backdrop as the final output; the source is already the backdrop input. */}
+          <feColorMatrix
             in={specMapUrl ? 'withSpecular' : 'saturated'}
-            in2="SourceGraphic"
-            operator="atop"
+            type="matrix"
+            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"
           />
         </filter>
       </defs>

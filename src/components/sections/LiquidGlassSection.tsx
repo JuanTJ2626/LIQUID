@@ -76,27 +76,22 @@ export const LiquidGlassSection: React.FC<{
   showNavbar?: boolean;
   showRightSidebar?: boolean;
   showLeftSidebar?: boolean;
-  showCanvasLens?: boolean;
   showMagnifyingGlass?: boolean;
   onToggleNavbar?: () => void;
   onToggleRightSidebar?: () => void;
   onToggleLeftSidebar?: () => void;
-  onToggleCanvasLens?: () => void;
   onToggleMagnifyingGlass?: () => void;
 }> = ({ 
   showNavbar = false,
   showRightSidebar = false,
   showLeftSidebar = false,
-  showCanvasLens = false,
   showMagnifyingGlass = false,
   onToggleNavbar,
   onToggleRightSidebar,
   onToggleLeftSidebar,
-  onToggleCanvasLens,
   onToggleMagnifyingGlass,
 }) => {
   const [specularOpacity, setSpecularOpacity] = useState(0.85);
-  const [specularSaturation, setSpecularSaturation] = useState(0);
   const [distortion, setDistortion] = useState(0.6);
   const [zoom, setZoom] = useState(1);
   const [inwardDistortion, setInwardDistortion] = useState(0.25);
@@ -252,15 +247,6 @@ export const LiquidGlassSection: React.FC<{
                     color="#ec4899"
                   />
                 )}
-                {onToggleCanvasLens && (
-                  <ToggleButton 
-                    label="CANVAS LENS"
-                    sublabel="Spherical magnifier"
-                    checked={showCanvasLens}
-                    onChange={onToggleCanvasLens}
-                    color="#10b981"
-                  />
-                )}
                 {onToggleMagnifyingGlass && (
                   <ToggleButton 
                     label="MAGNIFIER"
@@ -291,7 +277,7 @@ export const LiquidGlassSection: React.FC<{
                 fixed={true} width={280} height={180} borderRadius={9999}
                 zoom={zoom} bezelThickness={22} ior={1.45}
                 inwardDistortion={inwardDistortion}
-                specularOpacity={specularOpacity} specularSaturation={specularSaturation}
+                specularOpacity={specularOpacity}
                 distortion={distortion} specularAngle={315}
               />
             )}
@@ -300,7 +286,6 @@ export const LiquidGlassSection: React.FC<{
         <div style={{ marginTop: 36, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: '0.68rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 700, marginBottom: 4 }}>PARAMETERS</div>
           <Slider label="SPECULAR OPACITY" value={specularOpacity} min={0} max={1} step={0.01} onChange={setSpecularOpacity} />
-          <Slider label="SPECULAR SATURATION" value={specularSaturation} min={0} max={1} step={0.01} onChange={setSpecularSaturation} />
           <Slider label="BUBBLE ZOOM" value={zoom} min={0} max={2} step={0.01} onChange={setZoom} />
           <Slider label="INWARD DISTORTION" value={inwardDistortion} min={0} max={1} step={0.01} onChange={setInwardDistortion} />
           <Slider label="REFRACTION LEVEL" value={distortion} min={0.1} max={3.0} step={0.1} onChange={setDistortion} />
