@@ -300,7 +300,7 @@ export const LiquidGlass: React.FC<LiquidGlassProps> = ({
   const padXPercent = Math.max(30, Math.ceil((maxPixelShift / Math.max(1, width)) * 100 + 10));
   const padYPercent = Math.max(30, Math.ceil((maxPixelShift / Math.max(1, height)) * 100 + 10));
 
-  const isSvgActive = mode !== 'fallback' && (hasSvgBackdrop || forceSvgFilter);
+  const isSvgActive = mode !== 'fallback' && hasSvgBackdrop;
 
   const backdropStyle: CSSProperties = isSvgActive && dispMapUrl
     ? blur > 0
