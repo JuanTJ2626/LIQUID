@@ -14,7 +14,7 @@ import React, { useId, useMemo, useEffect, useState, useRef, type CSSProperties 
 import { createPortal } from 'react-dom';
 import { computeRefractionField, type SurfaceType } from './physics';
 import { generateDisplacementMap, generateSpecularMap } from './displacement';
-import { detectSvgBackdropSupport, LiquidGlassSvgDefs } from './svgFilters';
+import { detectSvgBackdropSupport, getGlassFallbackStyle, LiquidGlassSvgDefs } from './svgFilters';
 import { DebugOverlay } from './DebugOverlay';
 
 export interface LiquidGlassProps {
@@ -313,9 +313,9 @@ export const LiquidGlass: React.FC<LiquidGlassProps> = ({
           WebkitBackdropFilter: `url(#${filterId})`,
         }
     : {
-        backdropFilter: `blur(${Math.max(8, blur)}px)`,
-        WebkitBackdropFilter: `blur(${Math.max(8, blur)}px)`,
-        background: 'rgba(255, 255, 255, 0.12)',
+        ...getGlassFallbackStyle(),
+        backdropFilter: `blur(${Math.max(8, blur)}px) saturate(145%) contrast(105%)`,
+        WebkitBackdropFilter: `blur(${Math.max(8, blur)}px) saturate(145%) contrast(105%)`,
       };
 
   const wrapperStyle: CSSProperties = {
@@ -364,9 +364,7 @@ export const LiquidGlass: React.FC<LiquidGlassProps> = ({
             '0 16px 48px rgba(0, 0, 0, 0.28)',
             '0 1px 0 rgba(255, 255, 255, 0.15)',
           ].join(', '),
-          background: isSvgActive
-            ? 'rgba(255, 255, 255, 0.03)'
-            : 'rgba(255, 255, 255, 0.12)',
+          background: isSvgActive ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.10)',
           transition: reducedMotion ? 'none' : 'box-shadow 0.3s ease',
         }}
       />

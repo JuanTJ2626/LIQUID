@@ -12,7 +12,7 @@ import React, { useId, useMemo, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { computeRefractionField } from '../LiquidGlass/physics';
 import { generateDisplacementMap, generateZoomDisplacementMap } from '../LiquidGlass/displacement';
-import { detectSvgBackdropSupport, LiquidGlassMagnifierSvgDefs } from '../LiquidGlass/svgFilters';
+import { detectSvgBackdropSupport, getGlassFallbackStyle, LiquidGlassMagnifierSvgDefs } from '../LiquidGlass/svgFilters';
 
 interface LeftSidebarItem {
   icon: React.ReactNode;
@@ -167,9 +167,12 @@ export const LiquidGlassLeftSidebar: React.FC<{ items?: LeftSidebarItem[] }> = (
         <div style={{
           position:             'absolute', inset: 0,
           borderRadius:         BR, overflow: 'hidden',
-          backdropFilter:       supportsSvgBackdrop ? `url(#${filterId})` : 'blur(12px)',
-          WebkitBackdropFilter: supportsSvgBackdrop ? `url(#${filterId})` : 'blur(12px)',
-          background:           supportsSvgBackdrop ? 'transparent' : 'rgba(255,255,255,0.12)',
+          ...(supportsSvgBackdrop ? {
+            backdropFilter: `url(#${filterId})`,
+            WebkitBackdropFilter: `url(#${filterId})`,
+            background: 'transparent',
+            border: 'none',
+          } : getGlassFallbackStyle()),
           boxShadow: isDragging
             ? '0 24px 60px rgba(0,0,0,0.5), inset 0 0 0 0.5px rgba(255,255,255,0.35)'
             : '0 8px 28px rgba(0,0,0,0.28), inset 0 0 0 0.5px rgba(255,255,255,0.25)',

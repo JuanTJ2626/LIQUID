@@ -25,6 +25,15 @@ export function detectSvgBackdropSupport(): boolean {
   return Boolean(isChromium && !isFirefox && !isSafari);
 }
 
+export function getGlassFallbackStyle(): React.CSSProperties {
+  return {
+    backdropFilter: 'blur(18px) saturate(145%) contrast(105%)',
+    WebkitBackdropFilter: 'blur(18px) saturate(145%) contrast(105%)',
+    background: 'rgba(255, 255, 255, 0.10)',
+    border: '1px solid rgba(255, 255, 255, 0.22)',
+  };
+}
+
 export interface LiquidGlassSvgDefsProps {
   filterId: string;
   specularId: string;

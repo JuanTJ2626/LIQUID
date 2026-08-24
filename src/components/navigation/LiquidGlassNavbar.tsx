@@ -2,7 +2,7 @@ import React, { useState, useId, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { computeRefractionField } from '../LiquidGlass/physics';
 import { generateDisplacementMap, generateZoomDisplacementMap } from '../LiquidGlass/displacement';
-import { detectSvgBackdropSupport, LiquidGlassMagnifierSvgDefs } from '../LiquidGlass/svgFilters';
+import { detectSvgBackdropSupport, getGlassFallbackStyle, LiquidGlassMagnifierSvgDefs } from '../LiquidGlass/svgFilters';
 
 interface LiquidGlassNavbarProps {
   onMenuClick?: () => void;
@@ -131,9 +131,12 @@ export const LiquidGlassNavbar: React.FC<LiquidGlassNavbarProps> = ({ onMenuClic
         <div style={{
           position:             'absolute', inset: 0,
           borderRadius:         borderRadiusStyle, overflow: 'hidden',
-          backdropFilter:       supportsSvgBackdrop ? `url(#${filterId})` : 'blur(12px)',
-          WebkitBackdropFilter: supportsSvgBackdrop ? `url(#${filterId})` : 'blur(12px)',
-          background:           supportsSvgBackdrop ? 'transparent' : 'rgba(255,255,255,0.12)',
+          ...(supportsSvgBackdrop ? {
+            backdropFilter: `url(#${filterId})`,
+            WebkitBackdropFilter: `url(#${filterId})`,
+            background: 'transparent',
+            border: 'none',
+          } : getGlassFallbackStyle()),
           boxShadow:            isDragging
             ? '0 20px 50px rgba(0,0,0,0.45), inset 0 0 0 0.5px rgba(255,255,255,0.35)'
             : '0 8px 28px rgba(0,0,0,0.28), inset 0 0 0 0.5px rgba(255,255,255,0.25)',
