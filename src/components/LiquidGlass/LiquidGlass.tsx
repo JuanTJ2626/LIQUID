@@ -364,7 +364,7 @@ export const LiquidGlass: React.FC<LiquidGlassProps> = ({
             '0 16px 48px rgba(0, 0, 0, 0.28)',
             '0 1px 0 rgba(255, 255, 255, 0.15)',
           ].join(', '),
-          background: isSvgActive ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.10)',
+          background: isSvgActive ? 'rgba(255, 255, 255, 0.03)' : undefined,
           transition: reducedMotion ? 'none' : 'box-shadow 0.3s ease',
         }}
       />

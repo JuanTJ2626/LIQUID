@@ -27,10 +27,18 @@ export function detectSvgBackdropSupport(): boolean {
 
 export function getGlassFallbackStyle(): React.CSSProperties {
   return {
-    backdropFilter: 'blur(18px) saturate(145%) contrast(105%)',
-    WebkitBackdropFilter: 'blur(18px) saturate(145%) contrast(105%)',
-    background: 'rgba(255, 255, 255, 0.10)',
-    border: '1px solid rgba(255, 255, 255, 0.22)',
+    backdropFilter: 'blur(14px) saturate(160%) contrast(108%)',
+    WebkitBackdropFilter: 'blur(14px) saturate(160%) contrast(108%)',
+    background: [
+      'radial-gradient(ellipse 70% 115% at 18% 0%, rgba(255,255,255,0.22), transparent 48%)',
+      'linear-gradient(112deg, rgba(255,255,255,0.10), rgba(255,255,255,0.025) 42%, rgba(16,24,38,0.08))',
+    ].join(', '),
+    border: '1px solid rgba(255, 255, 255, 0.30)',
+    boxShadow: [
+      'inset 0 1px 0 rgba(255,255,255,0.52)',
+      'inset 0 -1px 0 rgba(0,0,0,0.16)',
+      '0 16px 42px rgba(0,0,0,0.25)',
+    ].join(', '),
   };
 }
 
