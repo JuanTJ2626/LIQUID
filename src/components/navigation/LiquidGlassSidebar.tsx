@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { computeRefractionField } from '../LiquidGlass/physics';
 import { generateDisplacementMap, generateZoomDisplacementMap } from '../LiquidGlass/displacement';
 import { detectSvgBackdropSupport, getGlassFallbackStyle, LiquidGlassMagnifierSvgDefs } from '../LiquidGlass/svgFilters';
+import { FluidCursorTrail } from '../LiquidGlass/FluidCursorTrail';
 
 interface SidebarItem {
   icon: React.ReactNode;
@@ -47,6 +48,9 @@ export const LiquidGlassSidebar: React.FC<LiquidGlassSidebarProps> = ({
   // ── Drag — igual que MagnifyingGlass ───────────────────────────────────────
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [tintHue,       setTintHue]       = useState(220);
+  const [tintIntensity, setTintIntensity] = useState(45);
+  const tintColor = `hsla(${tintHue}, 85%, 58%, ${(tintIntensity / 100) * 0.65})`;
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -143,11 +147,15 @@ export const LiquidGlassSidebar: React.FC<LiquidGlassSidebarProps> = ({
           cursor:      isDragging ? 'grabbing' : 'grab',
           touchAction: 'none',
           userSelect:  'none',
+          overflow:    'hidden',
           transition:  isDragging
             ? 'transform 0.05s ease-out'
             : 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1)',
         }}
       >
+        {/* Estela de luz fluida azul (debajo del vidrio para que lo refracte) */}
+        <FluidCursorTrail color="#0066ff" blurPx={20} maxRadius={48} fadeDuration={1000} />
+
         {/* Capa de vidrio */}
         <div style={{
           position:             'absolute', inset: 0,
@@ -163,6 +171,15 @@ export const LiquidGlassSidebar: React.FC<LiquidGlassSidebarProps> = ({
             : '0 8px 28px rgba(0,0,0,0.28), inset 0 0 0 0.5px rgba(255,255,255,0.25)',
           pointerEvents:        'none',
           transition:           'box-shadow 0.2s ease',
+        }} />
+
+        {/* Tinte de color dinámico + línea sólida abajo */}
+        <div style={{
+          position:      'absolute', inset: 0,
+          borderRadius:  borderRadiusStyle,
+          pointerEvents: 'none',
+          background:    `linear-gradient(to top, ${tintColor} 0%, transparent 65%)`,
+          boxShadow:     `inset 0 -1.5px 0 hsla(${tintHue},90%,62%,${(tintIntensity / 100)})`,
         }} />
 
         {/* Contenido */}
@@ -200,10 +217,69 @@ export const LiquidGlassSidebar: React.FC<LiquidGlassSidebarProps> = ({
             marginTop: 'auto', paddingTop: 20,
             borderTop: '1px solid rgba(255,255,255,0.08)',
             fontSize: '0.62rem', letterSpacing: '0.18em',
-            textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)',
+            textTransform: 'uppercase', color: 'rgba(255,255,255,0.15)',
             textAlign: 'center',
           }}>
             Liquid Glass · v1
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sliders flotantes a la izquierda del panel ── */}
+      <style>{`
+        .rp-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.6);cursor:pointer;}
+        .rp-slider::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.6);cursor:pointer;border:none;}
+      `}</style>
+      <div style={{
+        position:    'fixed',
+        top:         '50%',
+        right:       24 - pos.x + actualWidth + 12,
+        transform:   `translateY(calc(-50% + ${pos.y}px))`,
+        zIndex:      99999,
+        display:     'flex',
+        flexDirection: 'column',
+        gap:         14,
+        background:  'rgba(10,10,18,0.72)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        borderRadius: 16,
+        padding:     '14px 16px',
+        boxShadow:   '0 4px 20px rgba(0,0,0,0.35), inset 0 0 0 0.5px rgba(255,255,255,0.1)',
+        minWidth:    160,
+      }}>
+        {/* Preview dot */}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ width:10, height:10, borderRadius:'50%', background:`hsl(${tintHue},85%,58%)`, boxShadow:`0 0 7px hsla(${tintHue},85%,58%,0.9)`, flexShrink:0 }} />
+          <span style={{ fontSize:'0.6rem', color:'rgba(255,255,255,0.35)', fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase' }}>Glass Tint</span>
+        </div>
+
+        {/* Color */}
+        <div>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+            <span style={{ fontSize:'0.6rem', color:'rgba(255,255,255,0.4)', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase' }}>Color</span>
+            <span style={{ fontSize:'0.6rem', color:'rgba(255,255,255,0.25)' }}>{tintHue}°</span>
+          </div>
+          <div style={{ position:'relative', height:8 }}>
+            <div style={{ position:'absolute', inset:0, borderRadius:4, background:'linear-gradient(to right,hsl(0,85%,58%),hsl(60,85%,58%),hsl(120,85%,58%),hsl(180,85%,58%),hsl(240,85%,58%),hsl(300,85%,58%),hsl(360,85%,58%))', pointerEvents:'none' }} />
+            <input className="rp-slider" type="range" min={0} max={360} value={tintHue}
+              onChange={e => setTintHue(Number(e.target.value))}
+              style={{ position:'relative', width:'100%', height:8, appearance:'none', WebkitAppearance:'none', background:'transparent', cursor:'pointer', outline:'none', border:'none', margin:0, padding:0 }}
+            />
+          </div>
+        </div>
+
+        {/* Intensidad */}
+        <div>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+            <span style={{ fontSize:'0.6rem', color:'rgba(255,255,255,0.4)', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase' }}>Intensidad</span>
+            <span style={{ fontSize:'0.6rem', color:'rgba(255,255,255,0.25)' }}>{tintIntensity}%</span>
+          </div>
+          <div style={{ position:'relative', height:8 }}>
+            <div style={{ position:'absolute', inset:0, borderRadius:4, background:`linear-gradient(to right,transparent,hsla(${tintHue},85%,58%,0.9))`, pointerEvents:'none' }} />
+            <input className="rp-slider" type="range" min={0} max={100} value={tintIntensity}
+              onChange={e => setTintIntensity(Number(e.target.value))}
+              style={{ position:'relative', width:'100%', height:8, appearance:'none', WebkitAppearance:'none', background:'transparent', cursor:'pointer', outline:'none', border:'none', margin:0, padding:0 }}
+            />
           </div>
         </div>
       </div>

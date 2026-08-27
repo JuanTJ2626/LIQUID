@@ -166,8 +166,8 @@ export const LiquidGlassSvgDefs: React.FC<LiquidGlassSvgDefsProps> = ({
 
 export interface LiquidGlassMagnifierSvgDefsProps {
   filterId: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
   zoomMapUrl: string;
   rimMapUrl: string;
   specMapUrl?: string;
@@ -191,6 +191,31 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
 }) => {
   if (!zoomMapUrl || !rimMapUrl) return null;
 
+  // Si se pasan width/height: userSpaceOnUse con píxeles absolutos (para la lupa).
+  // Sin width/height: porcentajes — compatible con navbar y sidebars que no los pasan.
+  const hasSize = width !== undefined && height !== undefined;
+
+  const filterAttrs = hasSize
+    ? {
+        x:             String(-(width! * padXPercent) / 100),
+        y:             String(-(height! * padYPercent) / 100),
+        width:         String(width! * (1 + (2 * padXPercent) / 100)),
+        height:        String(height! * (1 + (2 * padYPercent) / 100)),
+        filterUnits:   'userSpaceOnUse',
+        primitiveUnits:'userSpaceOnUse',
+      }
+    : {
+        x:             `-${padXPercent}%`,
+        y:             `-${padYPercent}%`,
+        width:         `${100 + 2 * padXPercent}%`,
+        height:        `${100 + 2 * padYPercent}%`,
+        filterUnits:   'objectBoundingBox',
+        primitiveUnits:'objectBoundingBox',
+      };
+
+  const imgW = hasSize ? width! : '100%';
+  const imgH = hasSize ? height! : '100%';
+
   return (
     <svg
       aria-hidden="true"
@@ -199,18 +224,14 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
       <defs>
         <filter
           id={filterId}
-          x={-(width * padXPercent) / 100}
-          y={-(height * padYPercent) / 100}
-          width={width * (1 + (2 * padXPercent) / 100)}
-          height={height * (1 + (2 * padYPercent) / 100)}
-          filterUnits="userSpaceOnUse"
-          primitiveUnits="userSpaceOnUse"
+          {...filterAttrs}
           colorInterpolationFilters="sRGB"
         >
+          {/* 1. Zoom Map — magnification interior */}
           <feImage
             href={zoomMapUrl}
             xlinkHref={zoomMapUrl}
-            x="0" y="0" width={width} height={height}
+            x="0" y="0" width={imgW} height={imgH}
             result="zoomMap"
             preserveAspectRatio="none"
           />
@@ -222,11 +243,11 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
             yChannelSelector="G"
             result="zoomedGraphic"
           />
-          {/* 2. Rim Snell Refraction Map */}
+          {/* 2. Rim Map — Snell's Law outer bevel */}
           <feImage
             href={rimMapUrl}
             xlinkHref={rimMapUrl}
-            x="0" y="0" width={width} height={height}
+            x="0" y="0" width={imgW} height={imgH}
             result="rimMap"
             preserveAspectRatio="none"
           />
@@ -238,22 +259,20 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
             yChannelSelector="G"
             result="distortedGraphic"
           />
-
-          {/* 3. Subtle Color Saturation Accent */}
+          {/* 3. Color saturation accent */}
           <feColorMatrix
             in="distortedGraphic"
             type="saturate"
             values="1.08"
             result="saturated"
           />
-
-          {/* 4. Optional Specular Highlight Blend */}
+          {/* 4. Optional specular highlight */}
           {specMapUrl && (
             <>
               <feImage
                 href={specMapUrl}
                 xlinkHref={specMapUrl}
-                x="0" y="0" width={width} height={height}
+                x="0" y="0" width={imgW} height={imgH}
                 result="specMap"
                 preserveAspectRatio="none"
               />
@@ -265,8 +284,6 @@ export const LiquidGlassMagnifierSvgDefs: React.FC<LiquidGlassMagnifierSvgDefsPr
               />
             </>
           )}
-
-          {/* Keep the refracted backdrop as the final output; the source is already the backdrop input. */}
           <feColorMatrix
             in={specMapUrl ? 'withSpecular' : 'saturated'}
             type="matrix"

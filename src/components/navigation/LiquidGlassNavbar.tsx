@@ -10,14 +10,16 @@ interface LiquidGlassNavbarProps {
 
 export const LiquidGlassNavbar: React.FC<LiquidGlassNavbarProps> = ({ onMenuClick }) => {
   const [activeTab, setActiveTab] = useState('Optics');
+  const [tintHue,       setTintHue]       = useState(220);
+  const [tintIntensity, setTintIntensity] = useState(45);
+  const tintColor = `hsla(${tintHue}, 85%, 58%, ${(tintIntensity / 100) * 0.65})`;
 
-  // ── Drag state — igual que MagnifyingGlass ──────────────────────────────────
+  // ── Drag state ──────────────────────────────────────────────────────────────
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
-    // Solo drag desde la barra en sí, no desde los botones
     if ((e.target as HTMLElement).closest('button, nav')) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
@@ -128,21 +130,32 @@ export const LiquidGlassNavbar: React.FC<LiquidGlassNavbarProps> = ({ onMenuClic
         }}
       >
         {/* Capa de vidrio */}
+        <div
+          className={`navbar-glass-glow${isDragging ? ' dragging' : ''}`}
+          style={{
+            position:   'absolute', inset: 0,
+            borderRadius: borderRadiusStyle, overflow: 'hidden',
+            ...(supportsSvgBackdrop ? {
+              backdropFilter:       `url(#${filterId})`,
+              WebkitBackdropFilter: `url(#${filterId})`,
+              background:           'transparent',
+              border:               'none',
+            } : getGlassFallbackStyle()),
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Tinte de color controlado por sliders */}
         <div style={{
-          position:             'absolute', inset: 0,
-          borderRadius:         borderRadiusStyle, overflow: 'hidden',
-          ...(supportsSvgBackdrop ? {
-            backdropFilter: `url(#${filterId})`,
-            WebkitBackdropFilter: `url(#${filterId})`,
-            background: 'transparent',
-            border: 'none',
-          } : getGlassFallbackStyle()),
-          boxShadow:            isDragging
-            ? '0 20px 50px rgba(0,0,0,0.45), inset 0 0 0 0.5px rgba(255,255,255,0.35)'
-            : '0 8px 28px rgba(0,0,0,0.28), inset 0 0 0 0.5px rgba(255,255,255,0.25)',
-          pointerEvents:        'none',
-          transition:           'box-shadow 0.2s ease',
+          position:      'absolute',
+          inset:         0,
+          borderRadius:  borderRadiusStyle,
+          pointerEvents: 'none',
+          background:    `linear-gradient(to top, ${tintColor} 0%, transparent 65%)`,
+          boxShadow:     `inset 0 -1px 0 hsla(${tintHue},85%,68%,0.5)`,
         }} />
+
+
 
         {/* Logo */}
         <span style={{
@@ -183,6 +196,60 @@ export const LiquidGlassNavbar: React.FC<LiquidGlassNavbarProps> = ({ onMenuClic
           ))}
         </button>
       </header>
+
+      {/* ── Sliders de color — panel flotante debajo del navbar ── */}
+      <div style={{
+        position:     'fixed',
+        top:          20 + pos.y + actualHeight + 10,
+        left:         `calc(50% + ${pos.x}px)`,
+        transform:    'translateX(-50%)',
+        zIndex:       9998,
+        display:      'flex',
+        alignItems:   'center',
+        gap:          20,
+        background:   'rgba(10,10,18,0.72)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        borderRadius: 40,
+        padding:      '8px 20px',
+        boxShadow:    '0 4px 20px rgba(0,0,0,0.35), inset 0 0 0 0.5px rgba(255,255,255,0.1)',
+      }}>
+        <style>{`
+          .nav-tint-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.6);cursor:pointer;}
+          .nav-tint-slider::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.6);cursor:pointer;border:none;}
+        `}</style>
+
+        {/* Color dot preview */}
+        <div style={{
+          width:14, height:14, borderRadius:'50%', flexShrink:0,
+          background: `hsl(${tintHue},85%,58%)`,
+          boxShadow:  `0 0 8px hsla(${tintHue},85%,58%,0.8)`,
+        }} />
+
+        {/* Hue — arcoíris */}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:'0.6rem', color:'rgba(255,255,255,0.4)', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>Color</span>
+          <div style={{ position:'relative', width:110, height:8 }}>
+            <div style={{ position:'absolute', inset:0, borderRadius:4, background:'linear-gradient(to right,hsl(0,85%,58%),hsl(60,85%,58%),hsl(120,85%,58%),hsl(180,85%,58%),hsl(240,85%,58%),hsl(300,85%,58%),hsl(360,85%,58%))', pointerEvents:'none' }} />
+            <input className="nav-tint-slider" type="range" min={0} max={360} value={tintHue}
+              onChange={e => setTintHue(Number(e.target.value))}
+              style={{ position:'relative', width:'100%', height:8, appearance:'none', WebkitAppearance:'none', background:'transparent', cursor:'pointer', outline:'none', border:'none', margin:0, padding:0 }}
+            />
+          </div>
+        </div>
+
+        {/* Intensidad */}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:'0.6rem', color:'rgba(255,255,255,0.4)', fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase', whiteSpace:'nowrap' }}>Intensidad</span>
+          <div style={{ position:'relative', width:90, height:8 }}>
+            <div style={{ position:'absolute', inset:0, borderRadius:4, background:`linear-gradient(to right,transparent,hsla(${tintHue},85%,58%,0.9))`, pointerEvents:'none' }} />
+            <input className="nav-tint-slider" type="range" min={0} max={100} value={tintIntensity}
+              onChange={e => setTintIntensity(Number(e.target.value))}
+              style={{ position:'relative', width:'100%', height:8, appearance:'none', WebkitAppearance:'none', background:'transparent', cursor:'pointer', outline:'none', border:'none', margin:0, padding:0 }}
+            />
+          </div>
+        </div>
+      </div>
     </>,
     document.body
   );

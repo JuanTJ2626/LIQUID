@@ -9,7 +9,7 @@ export const GSAPMasterpieceSite: React.FC = () => {
   const [showLab, setShowLab] = useState(false);
   // Estado individual para cada elemento liquid glass
   const [showNavbar, setShowNavbar] = useState(false);
-  const [showRightSidebar, setShowRightSidebar] = useState(false);
+  const [showRightSidebar, setShowRightSidebar] = useState(true);
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showMagnifyingGlass, setShowMagnifyingGlass] = useState(false);
 
